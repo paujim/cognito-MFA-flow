@@ -14,9 +14,23 @@ class CognitoMfaFlowStack(core.Stack):
     def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        user_pool = cognito.UserPool(
+        pool = cognito.UserPool(
             scope=self,
             id="user-pool",
             mfa=cognito.Mfa.OPTIONAL,
             mfa_second_factor=cognito.MfaSecondFactor(otp=True, sms=True),
+            password_policy=cognito.PasswordPolicy(
+                min_length=12,
+                require_lowercase=True,
+                require_uppercase=False,
+                require_digits=False,
+                require_symbols=False,
+            )
+        )
+
+        client = pool.add_client(
+            id="customer-app-client",
+            auth_flows=cognito.AuthFlow(
+                user_password=True,
+                refresh_token=True),
         )
