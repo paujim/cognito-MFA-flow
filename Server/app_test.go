@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -108,6 +109,38 @@ func TestServer(t *testing.T) {
 		resp, err := http.Post(fmt.Sprintf("%s/v1/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
 		assert.NoError(err)
 		assert.Equal(resp.StatusCode, 401)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("Success registering MFA", func(t *testing.T) {
+		assert := assert.New(t)
+		mockClient := &mockedCognitoClient{}
+		mockClient.On("AssociateSoftwareToken", mock.Anything).Return(&cognitoidentityprovider.AssociateSoftwareTokenOutput{
+			SecretCode: aws.String("SECRET_CODE_GENERATED"),
+		}, nil)
+		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		defer ts.Close()
+
+		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/register", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN"}`))
+		assert.NoError(err)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("Validating registering MFA", func(t *testing.T) {
+		assert := assert.New(t)
+		mockClient := &mockedCognitoClient{}
+		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		defer ts.Close()
+
+		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/register", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
+		assert.NoError(err)
+
+		defer resp.Body.Close()
+		target := &MFAResponse{}
+		json.NewDecoder(resp.Body).Decode(target)
+
+		assert.Equal(http.StatusBadRequest, resp.StatusCode)
+		assert.Equal("Missing required parameter", *target.Message)
 		mockClient.AssertExpectations(t)
 	})
 }

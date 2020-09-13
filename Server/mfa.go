@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 
+	b64 "encoding/base64"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 	"github.com/gin-gonic/gin"
@@ -24,14 +26,16 @@ type MFAVerifyRequest struct {
 }
 
 type MFAResponse struct {
-	Message    *string `json:"message"`
-	SecretCode *string `json:"secret"`
+	Message            *string `json:"message"`
+	SecretCode         *string `json:"secret"`
+	GoogleAutheticator *string `json:"googleAutheticator"`
 }
 
-func successfulMFAResponse(c *gin.Context, secretCode *string) {
+func successfulMFAResponse(c *gin.Context, secretCode, googleAutheticator *string) {
 	c.JSON(http.StatusOK, MFAResponse{
-		Message:    aws.String("Success"),
-		SecretCode: secretCode,
+		Message:            aws.String("Success"),
+		SecretCode:         secretCode,
+		GoogleAutheticator: googleAutheticator,
 	})
 }
 
@@ -55,7 +59,12 @@ func (app *App) addMFARoutes(rg *gin.RouterGroup) {
 			log.Printf(err.Error())
 			return
 		}
-		successfulMFAResponse(c, res.SecretCode)
+		var encoded *string
+		if raw, err := generateGoogleAuthenticatorQRCode(*res.SecretCode, "PJ-Test", "PJ"); err == nil {
+			encoded = aws.String(b64.StdEncoding.EncodeToString(raw))
+		}
+
+		successfulMFAResponse(c, res.SecretCode, encoded)
 	})
 	mfa.POST("/enable", func(c *gin.Context) {
 
@@ -77,7 +86,7 @@ func (app *App) addMFARoutes(rg *gin.RouterGroup) {
 			log.Printf(err.Error())
 		}
 
-		successfulMFAResponse(c, nil)
+		successfulMFAResponse(c, nil, nil)
 	})
 	mfa.POST("/verify", func(c *gin.Context) {
 
@@ -104,7 +113,7 @@ func (app *App) addMFARoutes(rg *gin.RouterGroup) {
 			return
 		}
 
-		successfulMFAResponse(c, nil)
+		successfulMFAResponse(c, nil, nil)
 	})
 
 }
