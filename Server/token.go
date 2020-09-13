@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
-	cognito "github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,7 +31,7 @@ type TokenResponse struct {
 	RefreshToken *string `json:"refreshToken"`
 }
 
-func successfulResponse(c *gin.Context, result *cognito.AuthenticationResultType) {
+func successfulResponse(c *gin.Context, result *cognitoidentityprovider.AuthenticationResultType) {
 	c.JSON(http.StatusOK, TokenResponse{
 		Message:      aws.String("Success"),
 		AccessToken:  result.AccessToken,
@@ -50,7 +49,7 @@ func (app *App) addTokenRoutes(rg *gin.RouterGroup) {
 			c.JSON(http.StatusBadRequest, TokenResponse{Message: aws.String("Missing required parameter")})
 			return
 		}
-		res, err := app.CognitoClient.InitiateAuth(&cognito.InitiateAuthInput{
+		res, err := app.CognitoClient.InitiateAuth(&cognitoidentityprovider.InitiateAuthInput{
 			AuthFlow: aws.String("USER_PASSWORD_AUTH"),
 			AuthParameters: map[string]*string{
 				"USERNAME": request.Username,
