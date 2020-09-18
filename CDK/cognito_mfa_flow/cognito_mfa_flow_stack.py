@@ -7,6 +7,9 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_cognito as cognito,
     aws_apigateway as apigateway,
+    aws_certificatemanager as acm,
+    aws_route53 as route53,
+    aws_route53_targets as targets,
 )
 
 
@@ -28,7 +31,6 @@ class CognitoMfaFlowStack(core.Stack):
                 require_symbols=False,
             )
         )
-        self.pool = pool
 
         client = pool.add_client(
             id="customer-app-client",
@@ -36,14 +38,6 @@ class CognitoMfaFlowStack(core.Stack):
                 user_password=True,
                 refresh_token=True),
         )
-
-        self.client = client
-
-
-class MFAAPIStack(core.Stack):
-
-    def __init__(self, scope: core.Construct, id: str, pool: cognito.UserPool, client: cognito.UserPoolClient, **kwargs) -> None:
-        super().__init__(scope, id, **kwargs)
 
         backend = _lambda.Function(
             scope=self,
@@ -69,9 +63,13 @@ class MFAAPIStack(core.Stack):
                     "cognito-idp:VerifySoftwareToken"
                 ],
                 resources=[pool.user_pool_arn]))
-        apigateway.LambdaRestApi(
+
+        api = apigateway.LambdaRestApi(
             scope=self,
             id="mfa-api",
             handler=backend,
-            endpoint_types=[apigateway.EndpointType.REGIONAL]
+            endpoint_types=[apigateway.EndpointType.REGIONAL],
+            default_cors_preflight_options=apigateway.CorsOptions(
+                allow_origins=["*"])
         )
+
