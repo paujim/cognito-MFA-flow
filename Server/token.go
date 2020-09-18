@@ -26,7 +26,7 @@ type TokenCodeRequest struct {
 
 type TokenResponse struct {
 	Message      *string `json:"message"`
-	Session      *string `json:"sesstion"`
+	Session      *string `json:"session"`
 	AccessToken  *string `json:"accessToken"`
 	RefreshToken *string `json:"refreshToken"`
 }
