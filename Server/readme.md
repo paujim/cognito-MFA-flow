@@ -1,7 +1,7 @@
 # A lambda backend
 A gin server that uses aws cognito for authentication
 
-** Creating a deployment package on Windows
+**Creating a deployment package on Windows
 To create a .zip that will work on AWS Lambda using Windows, install the build-lambda-zip tool.
 
 ```
