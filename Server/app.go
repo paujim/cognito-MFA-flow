@@ -22,6 +22,23 @@ type App struct {
 	Router        *gin.Engine
 }
 
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, UPDATE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(200)
+		} else {
+			c.Next()
+		}
+	}
+}
+
 func createApp(userPoolID, appClientID string, cognitoClient IfaceApp) *App {
 	app := &App{
 		CognitoClient: cognitoClient,
@@ -29,6 +46,8 @@ func createApp(userPoolID, appClientID string, cognitoClient IfaceApp) *App {
 		AppClientID:   appClientID,
 		Router:        gin.Default(),
 	}
+	app.Router.Use(corsMiddleware())
+
 	log.Printf("Cold start")
 	v1 := app.Router.Group("/v1")
 	app.addPingRoutes(v1)

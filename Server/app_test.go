@@ -59,6 +59,11 @@ func (m *mockedCognitoClient) VerifySoftwareToken(input *cognitoidentityprovider
 	return args.Get(0).(*cognitoidentityprovider.VerifySoftwareTokenOutput), args.Error(1)
 }
 
+func jsonDecode(r *http.Response, target interface{}) error {
+	defer r.Body.Close()
+	return json.NewDecoder(r.Body).Decode(target)
+}
+
 func TestPingURL(t *testing.T) {
 	t.Run("Successful ping", func(t *testing.T) {
 		assert := assert.New(t)
@@ -67,7 +72,8 @@ func TestPingURL(t *testing.T) {
 		defer ts.Close()
 		resp, err := http.Get(fmt.Sprintf("%s/v1/ping", ts.URL))
 		assert.NoError(err)
-		assert.Equal(resp.StatusCode, 200)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+		assert.Equal("*", resp.Header.Get("Access-Control-Allow-Origin"))
 	})
 }
 
@@ -88,7 +94,11 @@ func TestTokenURL(t *testing.T) {
 		resp, err := http.Post(fmt.Sprintf("%s/v1/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
 		assert.NoError(err)
 
-		assert.Equal(resp.StatusCode, 200)
+		target := &TokenResponse{}
+		jsonDecode(resp, target)
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+		assert.Equal("ACCESS_TOKEN", *target.AccessToken)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("Validating token request", func(t *testing.T) {
@@ -99,9 +109,9 @@ func TestTokenURL(t *testing.T) {
 
 		resp, err := http.Post(fmt.Sprintf("%s/v1/token/", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo","value2": "hugo@password"}`))
 		assert.NoError(err)
-		defer resp.Body.Close()
+
 		target := &TokenResponse{}
-		json.NewDecoder(resp.Body).Decode(target)
+		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
 		assert.Equal("Missing required parameter", *target.Message)
@@ -118,7 +128,8 @@ func TestTokenURL(t *testing.T) {
 
 		resp, err := http.Post(fmt.Sprintf("%s/v1/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
 		assert.NoError(err)
-		assert.Equal(resp.StatusCode, 401)
+
+		assert.Equal(http.StatusUnauthorized, resp.StatusCode)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("Successful update", func(t *testing.T) {
@@ -135,7 +146,13 @@ func TestTokenURL(t *testing.T) {
 
 		resp, err := http.Post(fmt.Sprintf("%s/v1/token/update", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password", "session": "SESSION"}`))
 		assert.NoError(err)
-		assert.Equal(resp.StatusCode, 200)
+
+		target := &TokenResponse{}
+		jsonDecode(resp, target)
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+		assert.Equal("ACCESS_TOKEN", *target.AccessToken)
+
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("Validating update request", func(t *testing.T) {
@@ -146,9 +163,9 @@ func TestTokenURL(t *testing.T) {
 
 		resp, err := http.Post(fmt.Sprintf("%s/v1/token/update", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo"}`))
 		assert.NoError(err)
-		defer resp.Body.Close()
+
 		target := &TokenResponse{}
-		json.NewDecoder(resp.Body).Decode(target)
+		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
 		assert.Equal("Missing required parameter", *target.Message)
@@ -168,7 +185,12 @@ func TestTokenURL(t *testing.T) {
 
 		resp, err := http.Post(fmt.Sprintf("%s/v1/token/code", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","code": "123456", "session": "SESSION"}`))
 		assert.NoError(err)
-		assert.Equal(resp.StatusCode, 200)
+
+		target := &TokenResponse{}
+		jsonDecode(resp, target)
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+		assert.Equal("ACCESS_TOKEN", *target.AccessToken)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("Validating code request", func(t *testing.T) {
@@ -180,9 +202,8 @@ func TestTokenURL(t *testing.T) {
 		resp, err := http.Post(fmt.Sprintf("%s/v1/token/code", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo"}`))
 		assert.NoError(err)
 
-		defer resp.Body.Close()
 		target := &TokenResponse{}
-		json.NewDecoder(resp.Body).Decode(target)
+		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
 		assert.Equal("Missing required parameter", *target.Message)
@@ -203,7 +224,12 @@ func TestMFAURL(t *testing.T) {
 
 		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/register", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN"}`))
 		assert.NoError(err)
+
+		target := &MFAResponse{}
+		jsonDecode(resp, target)
+
 		assert.Equal(http.StatusOK, resp.StatusCode)
+		assert.Equal("SECRET_CODE_GENERATED", *target.SecretCode)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("Validating registering MFA", func(t *testing.T) {
@@ -215,9 +241,8 @@ func TestMFAURL(t *testing.T) {
 		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/register", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
-		defer resp.Body.Close()
 		target := &MFAResponse{}
-		json.NewDecoder(resp.Body).Decode(target)
+		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
 		assert.Equal("Missing required parameter", *target.Message)
@@ -245,9 +270,8 @@ func TestMFAURL(t *testing.T) {
 		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/enable", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
-		defer resp.Body.Close()
 		target := &MFAResponse{}
-		json.NewDecoder(resp.Body).Decode(target)
+		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
 		assert.Equal("Missing required parameter", *target.Message)
@@ -276,9 +300,8 @@ func TestMFAURL(t *testing.T) {
 		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN", "code": "123456"}`))
 		assert.NoError(err)
 
-		defer resp.Body.Close()
 		target := &MFAResponse{}
-		json.NewDecoder(resp.Body).Decode(target)
+		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
 		assert.Equal("Unable to verify code", *target.Message)
@@ -294,9 +317,8 @@ func TestMFAURL(t *testing.T) {
 		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
-		defer resp.Body.Close()
 		target := &MFAResponse{}
-		json.NewDecoder(resp.Body).Decode(target)
+		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
 		assert.Equal("Missing required parameter", *target.Message)
