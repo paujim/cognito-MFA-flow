@@ -70,7 +70,7 @@ func TestPingURL(t *testing.T) {
 		mockClient := &mockedCognitoClient{}
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
-		resp, err := http.Get(fmt.Sprintf("%s/v1/ping", ts.URL))
+		resp, err := http.Get(fmt.Sprintf("%s/ping", ts.URL))
 		assert.NoError(err)
 		assert.Equal(http.StatusOK, resp.StatusCode)
 		assert.Equal("*", resp.Header.Get("Access-Control-Allow-Origin"))
@@ -91,7 +91,7 @@ func TestTokenURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
 		assert.NoError(err)
 
 		target := &TokenResponse{}
@@ -101,13 +101,57 @@ func TestTokenURL(t *testing.T) {
 		assert.Equal("ACCESS_TOKEN", *target.AccessToken)
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("New password required", func(t *testing.T) {
+		assert := assert.New(t)
+		mockClient := &mockedCognitoClient{}
+		mockClient.On("InitiateAuth", mock.Anything).Return(&cognitoidentityprovider.InitiateAuthOutput{
+			ChallengeName: aws.String("NEW_PASSWORD_REQUIRED"),
+			Session:       aws.String("SESSION"),
+		}, nil)
+
+		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		defer ts.Close()
+
+		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
+		assert.NoError(err)
+
+		target := &TokenResponse{}
+		jsonDecode(resp, target)
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+		assert.Equal("New password required", *target.Message)
+		assert.Equal("SESSION", *target.Session)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("MFA code required", func(t *testing.T) {
+		assert := assert.New(t)
+		mockClient := &mockedCognitoClient{}
+		mockClient.On("InitiateAuth", mock.Anything).Return(&cognitoidentityprovider.InitiateAuthOutput{
+			ChallengeName: aws.String("SOFTWARE_TOKEN_MFA"),
+			Session:       aws.String("SESSION"),
+		}, nil)
+
+		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		defer ts.Close()
+
+		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
+		assert.NoError(err)
+
+		target := &TokenResponse{}
+		jsonDecode(resp, target)
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+		assert.Equal("MFA required", *target.Message)
+		assert.Equal("SESSION", *target.Session)
+		mockClient.AssertExpectations(t)
+	})
 	t.Run("Validating token request", func(t *testing.T) {
 		assert := assert.New(t)
 		mockClient := &mockedCognitoClient{}
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/token/", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo","value2": "hugo@password"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo","value2": "hugo@password"}`))
 		assert.NoError(err)
 
 		target := &TokenResponse{}
@@ -126,7 +170,7 @@ func TestTokenURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
 		assert.NoError(err)
 
 		assert.Equal(http.StatusUnauthorized, resp.StatusCode)
@@ -144,7 +188,7 @@ func TestTokenURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/token/update", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password", "session": "SESSION"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/token/update", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password", "session": "SESSION"}`))
 		assert.NoError(err)
 
 		target := &TokenResponse{}
@@ -161,7 +205,7 @@ func TestTokenURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/token/update", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/token/update", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo"}`))
 		assert.NoError(err)
 
 		target := &TokenResponse{}
@@ -183,7 +227,7 @@ func TestTokenURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/token/code", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","code": "123456", "session": "SESSION"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/token/code", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","code": "123456", "session": "SESSION"}`))
 		assert.NoError(err)
 
 		target := &TokenResponse{}
@@ -199,7 +243,7 @@ func TestTokenURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/token/code", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/token/code", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo"}`))
 		assert.NoError(err)
 
 		target := &TokenResponse{}
@@ -222,7 +266,7 @@ func TestMFAURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/register", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/mfa/register", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN"}`))
 		assert.NoError(err)
 
 		target := &MFAResponse{}
@@ -238,7 +282,7 @@ func TestMFAURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/register", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/mfa/register", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
 		target := &MFAResponse{}
@@ -256,7 +300,7 @@ func TestMFAURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/enable", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/mfa/enable", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN"}`))
 		assert.NoError(err)
 		assert.Equal(http.StatusOK, resp.StatusCode)
 		mockClient.AssertExpectations(t)
@@ -267,7 +311,7 @@ func TestMFAURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/enable", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/mfa/enable", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
 		target := &MFAResponse{}
@@ -285,7 +329,7 @@ func TestMFAURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN", "code": "123456"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN", "code": "123456"}`))
 		assert.NoError(err)
 		assert.Equal(http.StatusOK, resp.StatusCode)
 		mockClient.AssertExpectations(t)
@@ -297,7 +341,7 @@ func TestMFAURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN", "code": "123456"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN", "code": "123456"}`))
 		assert.NoError(err)
 
 		target := &MFAResponse{}
@@ -314,7 +358,7 @@ func TestMFAURL(t *testing.T) {
 		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
-		resp, err := http.Post(fmt.Sprintf("%s/v1/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
+		resp, err := http.Post(fmt.Sprintf("%s/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
 		target := &MFAResponse{}

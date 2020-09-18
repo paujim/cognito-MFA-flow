@@ -11,6 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	GoogleAutheticatorLabel  = "PJ-Test"
+	GoogleAutheticatorIssuer = "PJ"
+)
+
 type MFARegisterRequest struct {
 	AccessToken *string `form:"accessToken" json:"accessToken" binding:"required"`
 }
@@ -39,8 +44,8 @@ func successfulMFAResponse(c *gin.Context, secretCode, googleAutheticator *strin
 	})
 }
 
-func (app *App) addMFARoutes(rg *gin.RouterGroup) {
-	mfa := rg.Group("/mfa")
+func (app *App) addMFARoutes() {
+	mfa := app.Router.Group("/mfa")
 
 	mfa.POST("/register", func(c *gin.Context) {
 
@@ -60,7 +65,7 @@ func (app *App) addMFARoutes(rg *gin.RouterGroup) {
 			return
 		}
 		var encoded *string
-		if raw, err := generateGoogleAuthenticatorQRCode(*res.SecretCode, "PJ-Test", "PJ"); err == nil {
+		if raw, err := generateGoogleAuthenticatorQRCode(*res.SecretCode, GoogleAutheticatorLabel, GoogleAutheticatorIssuer); err == nil {
 			encoded = aws.String(b64.StdEncoding.EncodeToString(raw))
 		}
 

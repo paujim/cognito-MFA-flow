@@ -12,10 +12,11 @@ import (
 )
 
 var ginLambda *ginadapter.GinLambda
+var app *App
 
 func init() {
 	sess := session.Must(session.NewSession())
-	app := createApp(os.Getenv("USER_POOL_ID"), os.Getenv("CLIENT_ID"), cognito.New(sess))
+	app = createApp(os.Getenv("USER_POOL_ID"), os.Getenv("CLIENT_ID"), cognito.New(sess))
 	ginLambda = ginadapter.New(app.Router)
 }
 
@@ -24,5 +25,11 @@ func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 }
 
 func main() {
-	lambda.Start(Handler)
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
+		// running in the cloud
+		lambda.Start(Handler)
+	} else {
+		// running locally
+		app.Router.Run()
+	}
 }

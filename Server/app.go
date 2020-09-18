@@ -40,6 +40,7 @@ func corsMiddleware() gin.HandlerFunc {
 }
 
 func createApp(userPoolID, appClientID string, cognitoClient IfaceApp) *App {
+
 	app := &App{
 		CognitoClient: cognitoClient,
 		UserPoolID:    userPoolID,
@@ -49,10 +50,9 @@ func createApp(userPoolID, appClientID string, cognitoClient IfaceApp) *App {
 	app.Router.Use(corsMiddleware())
 
 	log.Printf("Cold start")
-	v1 := app.Router.Group("/v1")
-	app.addPingRoutes(v1)
-	app.addTokenRoutes(v1)
-	app.addMFARoutes(v1)
+	app.addPingRoutes()
+	app.addTokenRoutes()
+	app.addMFARoutes()
 
 	return app
 }

@@ -39,8 +39,8 @@ func successfulResponse(c *gin.Context, result *cognitoidentityprovider.Authenti
 	})
 }
 
-func (app *App) addTokenRoutes(rg *gin.RouterGroup) {
-	token := rg.Group("/token")
+func (app *App) addTokenRoutes() {
+	token := app.Router.Group("/token")
 
 	token.POST("/", func(c *gin.Context) {
 
