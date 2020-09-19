@@ -5,6 +5,7 @@ from aws_cdk import core
 from cognito_mfa_flow.cognito_mfa_flow_stack import(
     BuildPipelineStack,
     CognitoMfaFlowStack,
+    DeployPipelineStack,
 )
 
 
@@ -18,5 +19,11 @@ cognito_stack = CognitoMfaFlowStack(
     scope=app,
     id="cognito-mfa-flow",
     artifact_bucket=build_stack.artifact_bucket,
+)
+deploy_stack = DeployPipelineStack(
+    scope=app,
+    id="cognito-mfa-deploy-pipeline",
+    artifact_bucket=build_stack.artifact_bucket,
+    backend_fn=cognito_stack.backend_fn,
 )
 app.synth()

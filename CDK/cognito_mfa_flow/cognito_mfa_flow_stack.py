@@ -33,6 +33,7 @@ class BuildPipelineStack(core.Stack):
         artifact_bucket = s3.Bucket(
             scope=self,
             id="s3-artifact",
+            versioned=True,
         )
         self.artifact_bucket = artifact_bucket
 
@@ -159,7 +160,7 @@ class CognitoMfaFlowStack(core.Stack):
             },
             code=_lambda.Code.from_bucket(
                 bucket=artifact_bucket,
-                key="main.zip",
+                key="Server/main.zip",
             ),
         )
         backend.add_to_role_policy(
@@ -182,8 +183,15 @@ class CognitoMfaFlowStack(core.Stack):
                 allow_origins=["*"])
         )
 
+        core.CfnOutput(
+            scope=self,
+            id="apiURL",
+            value=api.url,
+        )
+        self.backend_fn = backend
 
-class DeploySourcePipelineStack(core.Stack):
+
+class DeployPipelineStack(core.Stack):
 
     def __init__(self, scope: core.Construct, id: str, artifact_bucket: s3.Bucket, backend_fn: _lambda.Function, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
@@ -193,15 +201,59 @@ class DeploySourcePipelineStack(core.Stack):
             id="source-update-function",
             runtime=_lambda.Runtime.PYTHON_3_8,
             handler="index.handler",
-            memory_size=500,
+            # memory_size=500,
             timeout=core.Duration.seconds(10),
-            environment={
-                "FUNCTION_NAME": backend_fn.function_name,
-            },
-            code=_lambda.Code(
-                os.path.join("lambda"))
+            code=_lambda.Code.from_asset(
+                os.path.join("lambdas", "updateSource"))
         )
-        artifact_bucket.add_event_notification(
-            event=s3.EventType.OBJECT_CREATED_PUT,
-            dest=s3n.LambdaDestination(fn),
+        fn.add_to_role_policy(
+            statement=iam.PolicyStatement(
+                actions=[
+                    "lambda:UpdateFunctionCode",
+                ],
+                resources=[
+                    backend_fn.function_arn,
+                ]))
+        fn.add_to_role_policy(
+            statement=iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                ],
+                resources=[
+                    artifact_bucket.bucket_arn + "/Server/main.zip",
+                ]))
+
+        # Codepipeline
+        deploy_pipeline = codepipeline.Pipeline(
+            scope=self,
+            id="deploy-pipeline",
+            restart_execution_on_update=True,
+        )
+
+        source_output = codepipeline.Artifact()
+        deploy_pipeline.add_stage(
+            stage_name="Source",
+            actions=[
+                codepipeline_actions.S3SourceAction(
+                    action_name="S3Source",
+                    bucket=artifact_bucket,
+                    bucket_key="Server/main.zip",
+                    output=source_output,
+                )]
+        )
+
+        deploy_pipeline.add_stage(
+            stage_name="LambdaUpdate",
+            actions=[
+                codepipeline_actions.LambdaInvokeAction(
+                    lambda_=fn,
+                    inputs=[source_output],
+                    action_name="UpdateSource",
+                    user_parameters={
+                        "functionName": backend_fn.function_name,
+                        "sourceBucket": artifact_bucket.bucket_name,
+                        "sourceKey": "Server/main.zip",
+                    }
+                )
+            ]
         )
