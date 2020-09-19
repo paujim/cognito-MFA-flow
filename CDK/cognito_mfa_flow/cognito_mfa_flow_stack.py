@@ -115,7 +115,7 @@ class BuildPipelineStack(core.Stack):
                     input=build_output,
                     action_name="S3Upload",
                     extract=True,
-                    object_key="Server/main.zip",
+                    # object_key="Server/main.zip",
                 )]
         )
 
