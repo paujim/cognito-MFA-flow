@@ -88,8 +88,8 @@ class BuildPipelineStack(core.Stack):
                 }
             },
             "artifacts": {
-                "base-directory": "Server",
-                "files": ["main.zip"],
+                # "base-directory": "Server",
+                "files": ["Server/main.zip"],
             }
         }
         build_output = codepipeline.Artifact()
@@ -115,7 +115,7 @@ class BuildPipelineStack(core.Stack):
                     input=build_output,
                     action_name="S3Upload",
                     extract=True,
-                    object_key="main.zip",
+                    object_key="Server/main.zip",
                 )]
         )
 
