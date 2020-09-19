@@ -65,32 +65,31 @@ class BuildPipelineStack(core.Stack):
             "version": "0.2",
             "env": {
                 "variables": {
-                    "ENV_NAME": "pj",
                     "GO111MODULE": "on",
                 }
             },
-            "phases":
-                {
-                    "install": {
-                        "commands": [
-                            "cd Server",
-                            "go get .",
-                        ]
-                    },
-                    "pre_build": {
-                        "commands": [
-                            "go test .",  # Run all tests included with our application
-                        ]
-                    },
-                    "build": {
-                        "commands": [
-                            "go build -o main",  # Build the go application
-                            "zip main.zip main",
-                        ]
-                    }
+            "phases": {
+                "install": {
+                    "commands": [
+                        "cd Server",
+                        "go get .",
+                    ]
+                },
+                "pre_build": {
+                    "commands": [
+                        "go test .",  # Run all tests included with our application
+                    ]
+                },
+                "build": {
+                    "commands": [
+                        "go build -o main",  # Build the go application
+                        "zip main.zip main",
+                    ]
+                }
             },
             "artifacts": {
-                    "files": ["main.zip"],
+                "base-directory": "Server",
+                "files": ["main.zip"],
             }
         }
         build_output = codepipeline.Artifact()
@@ -192,6 +191,15 @@ class DeploySourcePipelineStack(core.Stack):
         fn = _lambda.Function(
             scope=self,
             id="source-update-function",
+            runtime=_lambda.Runtime.PYTHON_3_8,
+            handler="index.handler",
+            memory_size=500,
+            timeout=core.Duration.seconds(10),
+            environment={
+                "FUNCTION_NAME": backend_fn.function_name,
+            },
+            code=_lambda.Code(
+                os.path.join("lambda"))
         )
         artifact_bucket.add_event_notification(
             event=s3.EventType.OBJECT_CREATED_PUT,
