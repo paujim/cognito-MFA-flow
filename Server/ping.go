@@ -10,7 +10,7 @@ func (app *App) addPingRoutes() {
 	ping := app.Router
 	ping.GET("ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
+			"message": "v1",
 		})
 	})
 }
