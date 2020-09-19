@@ -10,13 +10,121 @@ from aws_cdk import (
     aws_certificatemanager as acm,
     aws_route53 as route53,
     aws_route53_targets as targets,
+    aws_secretsmanager as secretsmanager,
+    aws_codebuild as codebuild,
+    aws_codedeploy as codedeploy,
+    aws_codecommit as codecommit,
+    aws_codepipeline as codepipeline,
+    aws_codepipeline_actions as codepipeline_actions,
+    aws_s3 as s3,
+    custom_resources as cr,
+    aws_s3_notifications as s3n,
 )
+
+SECRET_GITHUB_ID = "github/oAuthToken"
+SECRET_GITHUB_JSON_FIELD = "oAuthToken"
+
+
+class BuildPipelineStack(core.Stack):
+
+    def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
+        super().__init__(scope, id, **kwargs)
+
+        artifact_bucket = s3.Bucket(
+            scope=self,
+            id="s3-artifact",
+        )
+        self.artifact_bucket = artifact_bucket
+
+        oauth_token = core.SecretValue.secrets_manager(
+            secret_id=SECRET_GITHUB_ID,
+            json_field=SECRET_GITHUB_JSON_FIELD,
+        )
+
+        # Codepipeline
+        lambda_pipeline = codepipeline.Pipeline(
+            scope=self,
+            id="lambda-pipeline",
+            restart_execution_on_update=True,
+        )
+
+        source_output = codepipeline.Artifact()
+        lambda_pipeline.add_stage(
+            stage_name="Source",
+            actions=[
+                codepipeline_actions.GitHubSourceAction(
+                    oauth_token=oauth_token,
+                    action_name="GitHub",
+                    owner="paujim",
+                    repo="cognito-MFA-flow",
+                    output=source_output,
+                )]
+        )
+
+        build_specs = {
+            "version": "0.2",
+            "env": {
+                "variables": {
+                    "ENV_NAME": "pj",
+                    "GO111MODULE": "on",
+                }
+            },
+            "phases":
+                {
+                    "install": {
+                        "commands": [
+                            "cd Server",
+                            "go get .",
+                        ]
+                    },
+                    "pre_build": {
+                        "commands": [
+                            "go test .",  # Run all tests included with our application
+                        ]
+                    },
+                    "build": {
+                        "commands": [
+                            "go build -o main",  # Build the go application
+                            "zip main.zip main",
+                        ]
+                    }
+            },
+            "artifacts": {
+                    "files": ["main.zip"],
+            }
+        }
+        build_output = codepipeline.Artifact()
+        lambda_pipeline.add_stage(
+            stage_name="Build",
+            actions=[codepipeline_actions.CodeBuildAction(
+                action_name="CodeBuild",
+                project=codebuild.Project(
+                    scope=self,
+                    id="codebuild-build",
+                    build_spec=codebuild.BuildSpec.from_object(build_specs),
+                ),
+                input=source_output,
+                outputs=[build_output]
+            )]
+        )
+
+        lambda_pipeline.add_stage(
+            stage_name="Upload",
+            actions=[
+                codepipeline_actions.S3DeployAction(
+                    bucket=artifact_bucket,
+                    input=build_output,
+                    action_name="S3Upload",
+                    extract=True,
+                    object_key="main.zip",
+                )]
+        )
 
 
 class CognitoMfaFlowStack(core.Stack):
 
-    def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
-        super().__init__(scope, id, **kwargs)
+    def __init__(self, scope: core.Construct, id: str, artifact_bucket: s3.Bucket, **kwargs) -> None:
+        super().__init__(scope, id,  **kwargs)
 
         pool = cognito.UserPool(
             scope=self,
@@ -50,8 +158,10 @@ class CognitoMfaFlowStack(core.Stack):
                 "USER_POOL_ID": pool.user_pool_id,
                 "CLIENT_ID": client.user_pool_client_id,
             },
-            code=_lambda.Code.from_asset(
-                os.path.join("lambda", "main.zip"))
+            code=_lambda.Code.from_bucket(
+                bucket=artifact_bucket,
+                key="main.zip",
+            ),
         )
         backend.add_to_role_policy(
             statement=iam.PolicyStatement(
@@ -73,3 +183,17 @@ class CognitoMfaFlowStack(core.Stack):
                 allow_origins=["*"])
         )
 
+
+class DeploySourcePipelineStack(core.Stack):
+
+    def __init__(self, scope: core.Construct, id: str, artifact_bucket: s3.Bucket, backend_fn: _lambda.Function, **kwargs) -> None:
+        super().__init__(scope, id, **kwargs)
+
+        fn = _lambda.Function(
+            scope=self,
+            id="source-update-function",
+        )
+        artifact_bucket.add_event_notification(
+            event=s3.EventType.OBJECT_CREATED_PUT,
+            dest=s3n.LambdaDestination(fn),
+        )
