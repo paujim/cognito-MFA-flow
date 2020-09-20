@@ -19,6 +19,8 @@ from aws_cdk import (
     aws_s3 as s3,
     custom_resources as cr,
     aws_s3_notifications as s3n,
+    aws_cloudfront as cloudfront,
+    aws_cloudfront_origins as origins,
 )
 
 SECRET_GITHUB_ID = "github/oAuthToken"
@@ -84,13 +86,18 @@ class BuildPipelineStack(core.Stack):
                 "build": {
                     "commands": [
                         "go build -o main",  # Build the go application
-                        "zip main.zip main",
+                        "zip main.zip main",  # Zip the go application
+                        "cd ..",
+                        "zip -r Client.zip Client"
                     ]
                 }
             },
             "artifacts": {
                 # "base-directory": "Server",
-                "files": ["Server/main.zip"],
+                "files": [
+                    "Server/main.zip",
+                    "Client.zip",
+                ],
             }
         }
         build_output = codepipeline.Artifact()
@@ -189,6 +196,29 @@ class CognitoMfaFlowStack(core.Stack):
             value=api.url,
         )
         self.backend_fn = backend
+
+        static_website_bucket = s3.Bucket(
+            scope=self,
+            id="static-website-bucket",
+        )
+
+        distribution = cloudfront.CloudFrontWebDistribution(
+            scope=self,
+            id="static-website-distribution",
+            default_root_object="index.html",
+            origin_configs=[
+                cloudfront.SourceConfiguration(
+                    s3_origin_source=cloudfront.S3OriginConfig(
+                        s3_bucket_source=static_website_bucket,
+                        origin_access_identity=cloudfront.OriginAccessIdentity(
+                            scope=self,
+                            id="origin-access-identity",
+                        )
+                    ),
+                    behaviors=[cloudfront.Behavior(is_default_behavior=True)]
+                )
+            ],
+        )
 
 
 class DeployPipelineStack(core.Stack):
