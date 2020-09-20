@@ -11,6 +11,10 @@ import Typography from '@material-ui/core/Typography';
 import Grid from '@material-ui/core/Grid';
 import Divider from '@material-ui/core/Divider';
 import CircularProgress from '@material-ui/core/CircularProgress';
+import TextField from '@material-ui/core/TextField';
+import InputAdornment from '@material-ui/core/InputAdornment';
+import IconButton from '@material-ui/core/IconButton';
+import SendIcon from '@material-ui/icons/Send';
 
 import PhonelinkLockIcon from '@material-ui/icons/PhonelinkLock';
 
@@ -41,6 +45,10 @@ const useStyles = makeStyles((theme) => ({
     pos: {
         marginBottom: 24,
     },
+    spacer: {
+        marginTop: 24,
+        marginBottom: 24,
+    },
 }));
 
 const timeConverter = (unixTimestamp) => {
@@ -59,7 +67,7 @@ const timeConverter = (unixTimestamp) => {
 const TokenText = (props) => {
     if (props.exp) {
         return (
-            <Typography variant="body2" component="div" >
+            <Typography variant="body2" component="div" className={props.className}>
                 Token expiration date: <span color="primary">{timeConverter(props.exp)}</span>
                 <br />
             Issued by: <span color="textSecondary">{props.iss}</span>
@@ -74,8 +82,12 @@ export default function Layout(props) {
     const { user } = React.useContext(UserContext)
 
     const [isLoading, setIsLoading] = React.useState(false);
+    const [code, setCode] = React.useState();
     const [mfaData, setMfaData] = React.useState({ hasMfa: false });
 
+    const handleCodeChange = (event) => {
+        setCode(event.target.value)
+    }
 
     const handleRegisterMfa = () => {
         setIsLoading(true)
@@ -90,6 +102,21 @@ export default function Layout(props) {
             .catch(error => {
                 setIsLoading(false)
                 console.log("MFA Registration Falied")
+            })
+    }
+    const handleVerifyMfaCode = () => {
+        setIsLoading(true)
+        useAuthAPI.verifyMFA(useAuthAPI.getToken(), code)
+            .then(data => {
+                setIsLoading(false)
+                console.log(data)
+                setMfaData({ hasMfa: false })
+                console.log("MFA Code Verified Successfully")
+
+            })
+            .catch(error => {
+                setIsLoading(false)
+                console.log("MFA Code Verification Falied")
             })
     }
 
@@ -115,12 +142,35 @@ export default function Layout(props) {
                             <CardContent>
                                 <Typography gutterBottom variant="h5" component="h2">
                                     Google Autheticator QR
-                            </Typography>
+                                </Typography>
                                 <img className={classes.qrCode} src={`data:image/png;base64,${mfaData.data.googleAutheticator}`} alt={"QR Code"} />
+                                <TextField
+                                    id="input-with-icon-textfield"
+                                    label="code"
+                                    helperText="Send the code from Google Authenticator"
+                                    fullWidth
+                                    variant="outlined"
+                                    value={code}
+                                    onChange={handleCodeChange}
+                                    InputProps={{
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    aria-label="verify code"
+                                                    onClick={handleVerifyMfaCode}
+                                                    // onMouseDown={handleClickVerifyCode}
+                                                    edge="end"
+                                                >
+                                                    <SendIcon />
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
                             </CardContent>}
                         <CardActions>
                             <div className={classes.wrapper}>
-                                <Button size="small" disabled={isLoading || !useAuthAPI.isAuthenticated()} startIcon={<PhonelinkLockIcon />} onClick={handleRegisterMfa}>Add MFA</Button>
+                                <Button size="small" disabled={isLoading || !useAuthAPI.isAuthenticated()} startIcon={<PhonelinkLockIcon />} onClick={handleRegisterMfa}>QR Code</Button>
                                 {isLoading && <CircularProgress size={24} className={classes.buttonProgress} />}
                             </div>
                         </CardActions>

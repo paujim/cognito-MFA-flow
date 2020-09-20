@@ -37,8 +37,16 @@ const changePassword = (username, password, session) => {
   return client('token/update', "POST", { username, password, session }, "Unable update password")
 }
 
+const verifyCode = (username, code, session) => {
+  return client('token/code', "POST", { username, code, session }, "Unable verify code")
+}
+
 const registerMFA = (accessToken) => {
   return client('mfa/register', "POST", { accessToken }, "Unable register MFA")
+}
+
+const verifyMFA = (accessToken, code) => {
+  return client('mfa/verify', "POST", { accessToken, code, deviceName:"Galaxy" }, "Unable verify code")
 }
 
 const logout = () => {
@@ -75,6 +83,8 @@ const useAuthAPI = {
   logout,
   isAuthenticated,
   registerMFA,
+  verifyMFA,
+  verifyCode,
 }
 
 export { useAuthAPI }

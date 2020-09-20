@@ -16,6 +16,7 @@ import FingerprintIcon from '@material-ui/icons/Fingerprint';
 
 import FormUsernamePassword from './formUsernamePassword'
 import FormNewPassword from './formNewPassword'
+import FormCode from './formCode'
 
 import { useAuthAPI } from "../utils/auth-api";
 import { UserContext } from "../context/user";
@@ -67,6 +68,8 @@ const FormSwitch = (props) => {
             return (<FormUsernamePassword {...props} />)
         case 1:
             return (<FormNewPassword {...props} />)
+        case 2:
+            return (<FormCode {...props} />)
         default:
             return (<form noValidate></form>)
     }
@@ -109,6 +112,9 @@ export default function LoginDialog(props) {
             case 1:
                 CallChangePassword()
                 break;
+            case 2:
+                CallVerifyCode()
+                break;
             default:
                 break;
         }
@@ -141,6 +147,11 @@ export default function LoginDialog(props) {
         setPassword(event.target.value);
     };
 
+    const [code, setCode] = React.useState();
+    const handleChangeCode = event => {
+        setCode(event.target.value);
+    };
+
     const CallGetCredentials = () => {
         setIsLoading(true)
         useAuthAPI.login(username, password)
@@ -150,7 +161,12 @@ export default function LoginDialog(props) {
                 if (data && data.message === "New password required") {
                     console.log(data.session)
                     useAuthAPI.setSession(data.session)
-                    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+                    setActiveStep(1);
+                }
+                if (data && data.message === "MFA required") {
+                    console.log(data.session)
+                    useAuthAPI.setSession(data.session)
+                    setActiveStep(2);
                 }
                 if (data && data.accessToken) {
                     console.log("Logged in Successfully")
@@ -183,6 +199,24 @@ export default function LoginDialog(props) {
             })
     }
 
+    const CallVerifyCode = () => {
+        setIsLoading(true)
+        useAuthAPI.verifyCode(username, code, useAuthAPI.getSession())
+            .then(data => {
+                setIsLoading(false)
+                if (data && data.accessToken) {
+                    console.log("Password Changed Successfully")
+                    handleAccessToken(data.accessToken)
+                }
+            })
+            .catch(error => {
+                setIsLoading(false)
+                console.log("Password Change Falied")
+                handleError(error)
+
+            })
+    }
+
     const classes = useStyles();
     const maxSteps = 3
 
@@ -199,7 +233,7 @@ export default function LoginDialog(props) {
                         <Avatar className={classes.avatar}>
                             <FingerprintIcon />
                         </Avatar>
-                        <FormSwitch handleChangeUsername={handleChangeUsername} handleChangePassword={handleChangePassword} isLoading={isLoading} step={activeStep} />
+                        <FormSwitch handleChangeUsername={handleChangeUsername} handleChangePassword={handleChangePassword} handleChangeCode={handleChangeCode} isLoading={isLoading} step={activeStep} />
                         <SnackbarError open={errorMessage.show} message={errorMessage.message} />
                     </div>
                     <MobileStepper
@@ -209,7 +243,7 @@ export default function LoginDialog(props) {
                         activeStep={activeStep}
                         className={classes.stepper}
                         nextButton={
-                            <Button size="small" onClick={handleNext} disabled={activeStep === maxSteps - 1}> Next
+                            <Button size="small" onClick={handleNext} disabled={activeStep === maxSteps}> Next
                                 <KeyboardArrowRight />
                             </Button>
                         }
