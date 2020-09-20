@@ -21,8 +21,8 @@ import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
 import AccountCircleIcon from '@material-ui/icons/AccountCircle';
 import FingerprintIcon from '@material-ui/icons/Fingerprint';
 
-import { useAuth } from "../context/auth";
-
+import { useAuthAPI } from "../utils/auth-api";
+import { UserContext } from "../context/user";
 
 const useStyles = makeStyles((theme) => ({
     title: {
@@ -64,8 +64,6 @@ const useStyles = makeStyles((theme) => ({
         // color: theme.palette.grey[500],
     },
 }));
-
-const { login, changePassword, setSession, getSession, setToken } = useAuth;
 
 const FormUsernamePassword = (props) => {
     const classes = useStyles();
@@ -158,8 +156,6 @@ const FormSwitch = (props) => {
         default:
             return (<form className={classes.form} noValidate></form>)
     }
-
-
 }
 
 
@@ -184,14 +180,16 @@ const SnackbarError = (props) => {
     )
 }
 
-export default function LoginForm(props) {
+export default function LoginDialog(props) {
+
+    const { setUser } = React.useContext(UserContext)
 
     const [isLoading, setIsLoading] = React.useState(false);
 
     const [activeStep, setActiveStep] = React.useState(0);
     const handleNext = () => {
 
-        switch(activeStep){
+        switch (activeStep) {
             case 0:
                 CallGetCredentials()
                 break;
@@ -227,21 +225,22 @@ export default function LoginForm(props) {
 
     const CallGetCredentials = () => {
         setIsLoading(true)
-        login(username, password)
+        useAuthAPI.login(username, password)
             .then(data => {
                 setIsLoading(false)
                 console.log("LOGIN_OK")
                 console.log(data)
                 if (data && data.message === "New password required") {
                     console.log(data.session)
-                    setSession(data.session)
+                    useAuthAPI.setSession(data.session)
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
-                if (data && data.accessToken){
-                    setToken(data.accessToken)
+                if (data && data.accessToken) {
+                    useAuthAPI.setToken(data.accessToken)
+                    setUser(useAuthAPI.getUser())
                     props.handleClose()
                 }
-                
+
             })
             .catch(error => {
                 setIsLoading(false)
@@ -250,11 +249,11 @@ export default function LoginForm(props) {
     }
     const CallChangePassword = () => {
         setIsLoading(true)
-        changePassword(username, password, getSession())
+        useAuthAPI.changePassword(username, password, useAuthAPI.getSession())
             .then(data => {
                 setIsLoading(false)
                 console.log("Password Changed Successfully")
-                setToken(data.accessToken)
+                useAuthAPI.setToken(data.accessToken)
                 props.handleClose()
             })
             .catch(error => {
@@ -305,4 +304,3 @@ export default function LoginForm(props) {
         </div>
     );
 }
-

@@ -1,5 +1,5 @@
-import React from 'react'
 import axios from 'axios'
+import jwt from 'jwt-decode'
 
 const authURL = process.env.REACT_APP_AUTH_URL
 const localStorageKey = '__auth_provider_token__'
@@ -13,8 +13,12 @@ const setSession = (session) => {
 }
 
 const getToken = () => {
-  // this is where we make a request to retrieve the user's token.
   return window.localStorage.getItem(localStorageKey)
+}
+
+const getUser = () => {
+  let token = getToken()
+  return token ? jwt(token) : { username: "Guest" }
 }
 
 const setToken = (token) => {
@@ -28,7 +32,7 @@ const isAuthenticated = () => {
 
 const login = (username, password) => {
   return client('token/', "POST", { username, password })
-    .then( response => {
+    .then(response => {
       return response.data
     })
     .catch(async (error) => {
@@ -43,7 +47,7 @@ const login = (username, password) => {
 
 const changePassword = (username, password, session) => {
   return client('token/update', "POST", { username, password, session })
-    .then( response => {
+    .then(response => {
       return response.data
     })
     .catch(async (error) => {
@@ -58,29 +62,28 @@ const changePassword = (username, password, session) => {
 
 const logout = async () => {
   window.localStorage.removeItem(localStorageKey)
+  window.location.reload();
 }
 
 const client = (endpoint, method, data) => {
   const config = {
     method: method,
-    url:`${authURL}/${endpoint}`,
+    url: `${authURL}/${endpoint}`,
     data,
   }
   return axios(config)
 }
 
-const AuthContext = React.createContext()
-AuthContext.displayName = 'AuthContext'
-
-const useAuth = {
+const useAuthAPI = {
   setSession,
   getSession,
   getToken,
   setToken,
+  getUser,
   login,
   changePassword,
   logout,
   isAuthenticated,
 }
 
-export { useAuth, AuthContext }
+export { useAuthAPI }

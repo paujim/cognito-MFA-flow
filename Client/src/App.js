@@ -6,8 +6,10 @@ import Typography from '@material-ui/core/Typography';
 import Button from '@material-ui/core/Button';
 import Container from '@material-ui/core/Container';
 
-import { useAuth } from "./context/auth";
-import LoginForm from './components/loginForm'
+import { UserProvider  } from "./context/user";
+import { useAuthAPI } from "./utils/auth-api";
+import LoginDialog from './components/loginDialog'
+import Layout from './components/layout'
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -21,16 +23,13 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-
-
-export default function ButtonAppBar() {
+export default function App() {
 
     const [open, setOpen] = React.useState(false);
 
     const handleClickOpen = () => {
-        console.log(useAuth.isAuthenticated())
-        if (useAuth.isAuthenticated()) {
-            useAuth.logout()
+        if (useAuthAPI.isAuthenticated()) {
+            useAuthAPI.logout()
         }
         else {
             setOpen(true);
@@ -42,19 +41,23 @@ export default function ButtonAppBar() {
     };
 
     const classes = useStyles();
+
     return (
-        <Container maxWidth="lg">
-            <div className={classes.root}>
-                <AppBar position="static">
-                    <Toolbar>
-                        <Typography variant="h6" className={classes.title}>
-                            MFA Sample
+        <UserProvider >
+            <Container maxWidth="lg">
+                <div className={classes.root}>
+                    <AppBar position="static">
+                        <Toolbar>
+                            <Typography variant="h6" className={classes.title}>
+                                MFA Sample
                             </Typography>
-                        <Button color="inherit" onClick={handleClickOpen}>{!useAuth.isAuthenticated() ? "Login" : "Logout"}</Button>
-                        <LoginForm open={open} handleClose={handleClose} />
-                    </Toolbar>
-                </AppBar>
-            </div>
-        </Container>
+                            <Button color="inherit" onClick={handleClickOpen}>{!useAuthAPI.isAuthenticated() ? "Login" : "Logout"}</Button>
+                            <LoginDialog open={open} handleClose={handleClose} />
+                        </Toolbar>
+                    </AppBar>
+                    <Layout isAuthenticated={useAuthAPI.isAuthenticated()} title={"User:"} />
+                </div>
+            </Container>
+        </UserProvider >
     );
 }
