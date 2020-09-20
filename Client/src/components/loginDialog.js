@@ -3,23 +3,19 @@ import { makeStyles } from '@material-ui/core/styles';
 import Dialog from '@material-ui/core/Dialog';
 import MuiDialogTitle from '@material-ui/core/DialogTitle';
 import IconButton from '@material-ui/core/IconButton';
-import TextField from '@material-ui/core/TextField';
 import Avatar from '@material-ui/core/Avatar';
 import Container from '@material-ui/core/Container';
-import InputAdornment from '@material-ui/core/InputAdornment';
 import Snackbar from '@material-ui/core/Snackbar';
 import MobileStepper from '@material-ui/core/MobileStepper';
 import Button from '@material-ui/core/Button';
-import LinearProgress from '@material-ui/core/LinearProgress';
-import Typography from '@material-ui/core/Typography';
-
 
 import KeyboardArrowLeft from '@material-ui/icons/KeyboardArrowLeft';
 import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
 import CloseIcon from '@material-ui/icons/Close';
-import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
-import AccountCircleIcon from '@material-ui/icons/AccountCircle';
 import FingerprintIcon from '@material-ui/icons/Fingerprint';
+
+import FormUsernamePassword from './formUsernamePassword'
+import FormNewPassword from './formNewPassword'
 
 import { useAuthAPI } from "../utils/auth-api";
 import { UserContext } from "../context/user";
@@ -65,99 +61,16 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-const FormUsernamePassword = (props) => {
-    const classes = useStyles();
-
-    return (
-        <form className={classes.form} noValidate>
-            <TextField
-                disabled={props.isLoading}
-                InputProps={{
-                    startAdornment: (
-                        <InputAdornment position="start">
-                            <AccountCircleIcon />
-                        </InputAdornment>
-                    ),
-                }}
-                required
-                variant="outlined"
-                fullWidth
-                id="username"
-                label="username"
-                name="username"
-                autoFocus
-                onChange={props.handleChangeUsername}
-            />
-            <TextField
-                disabled={props.isLoading}
-                variant="outlined"
-                InputProps={{
-                    startAdornment: (
-                        <InputAdornment position="start">
-                            <LockOutlinedIcon />
-                        </InputAdornment>
-                    ),
-                }}
-                margin="normal"
-                required
-                fullWidth
-                name="password"
-                label="Password"
-                type="password"
-                id="password"
-                onChange={props.handleChangePassword}
-            />
-            {props.isLoading ? <LinearProgress /> : null}
-        </form>
-    )
-}
-
-const FormNewPassword = (props) => {
-    const classes = useStyles();
-
-    return (
-        <form className={classes.form} noValidate>
-            <TextField
-                disabled={props.isLoading}
-                variant="outlined"
-                InputProps={{
-                    startAdornment: (
-                        <InputAdornment position="start">
-                            <LockOutlinedIcon />
-                        </InputAdornment>
-                    ),
-                }}
-                margin="normal"
-                required
-                fullWidth
-                name="password"
-                label="Password"
-                type="password"
-                id="password"
-                autoFocus
-                onChange={props.handleChangePassword}
-            />
-            <Typography variant="button" display="block" gutterBottom className={classes.title}>
-                New password required
-            </Typography>
-            {props.isLoading ? <LinearProgress /> : null}
-        </form>
-    )
-}
-
 const FormSwitch = (props) => {
-    const classes = useStyles();
-
     switch (props.step) {
         case 0:
             return (<FormUsernamePassword {...props} />)
         case 1:
             return (<FormNewPassword {...props} />)
         default:
-            return (<form className={classes.form} noValidate></form>)
+            return (<form noValidate></form>)
     }
 }
-
 
 const SnackbarError = (props) => {
     return (
@@ -199,8 +112,6 @@ export default function LoginDialog(props) {
             default:
                 break;
         }
-
-        // setActiveStep((prevActiveStep) => prevActiveStep + 1);
     };
     const handleBack = () => {
         setActiveStep(0);
@@ -213,9 +124,16 @@ export default function LoginDialog(props) {
         setUsername(event.target.value);
     };
 
-    const handleError = (errorMessage) => {
-        console.log(errorMessage)
-        setErrorMessage({ message: errorMessage, show: true })
+    const handleError = (error) => {
+        console.log(error.message)
+        setErrorMessage({ message: error.message, show: true })
+    }
+
+    const handleAccessToken = (accessToken) => {
+        useAuthAPI.setToken(accessToken)
+        let user = useAuthAPI.decodeUser(accessToken)
+        setUser(user)
+        props.handleClose()
     }
 
     const [password, setPassword] = React.useState("");
@@ -228,7 +146,6 @@ export default function LoginDialog(props) {
         useAuthAPI.login(username, password)
             .then(data => {
                 setIsLoading(false)
-                console.log("LOGIN_OK")
                 console.log(data)
                 if (data && data.message === "New password required") {
                     console.log(data.session)
@@ -236,30 +153,33 @@ export default function LoginDialog(props) {
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
                 if (data && data.accessToken) {
-                    useAuthAPI.setToken(data.accessToken)
-                    setUser(useAuthAPI.getUser())
-                    props.handleClose()
+                    console.log("Logged in Successfully")
+                    handleAccessToken(data.accessToken)
                 }
 
             })
             .catch(error => {
                 setIsLoading(false)
+                console.log("Login Falied")
                 handleError(error)
             })
     }
+
     const CallChangePassword = () => {
         setIsLoading(true)
         useAuthAPI.changePassword(username, password, useAuthAPI.getSession())
             .then(data => {
                 setIsLoading(false)
-                console.log("Password Changed Successfully")
-                useAuthAPI.setToken(data.accessToken)
-                props.handleClose()
+                if (data && data.accessToken) {
+                    console.log("Password Changed Successfully")
+                    handleAccessToken(data.accessToken)
+                }
             })
             .catch(error => {
                 setIsLoading(false)
-                console.log(error)
+                console.log("Password Change Falied")
                 handleError(error)
+
             })
     }
 

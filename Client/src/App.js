@@ -43,7 +43,7 @@ export default function App() {
     const classes = useStyles();
 
     return (
-        <UserProvider >
+        <UserProvider>
             <Container maxWidth="lg">
                 <div className={classes.root}>
                     <AppBar position="static">
@@ -58,6 +58,6 @@ export default function App() {
                     <Layout isAuthenticated={useAuthAPI.isAuthenticated()} title={"User:"} />
                 </div>
             </Container>
-        </UserProvider >
+        </UserProvider>
     );
 }

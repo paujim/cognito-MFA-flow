@@ -1,35 +1,69 @@
 import React from 'react';
+
 import { makeStyles } from '@material-ui/core/styles';
+
 import Card from '@material-ui/core/Card';
 import CardActions from '@material-ui/core/CardActions';
 import CardContent from '@material-ui/core/CardContent';
+
 import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 import Grid from '@material-ui/core/Grid';
-import { UserContext } from "../context/user";
+import Divider from '@material-ui/core/Divider';
+import CircularProgress from '@material-ui/core/CircularProgress';
 
+import PhonelinkLockIcon from '@material-ui/icons/PhonelinkLock';
+
+import { UserContext } from "../context/user";
+import { useAuthAPI } from "../utils/auth-api";
 
 const useStyles = makeStyles((theme) => ({
     card: {
         minWidth: 275,
     },
-    bullet: {
-        display: 'inline-block',
-        margin: '0 2px',
-        transform: 'scale(0.8)',
-    },
-    title: {
-        fontSize: 14,
-    },
-    pos: {
-        marginBottom: 12,
-    },
+    wrapper: {
+        margin: theme.spacing(1),
+        position: 'relative',
+      },
+    buttonProgress: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        marginTop: -8,
+        marginLeft: -4,
+      },
+      media: {
+        height: 140,
+      },
+      qrCode: {
+          width:"100%",
+        },
 }));
 
-export default function Dashboard(props) {
+export default function Layout(props) {
     const classes = useStyles();
 
-    const {user} = React.useContext(UserContext)
+    const { user } = React.useContext(UserContext)
+
+    const [isLoading, setIsLoading] = React.useState(false);
+    const [mfaData, setMfaData] = React.useState({ hasMfa: false });
+
+
+    const handleRegisterMfa = () => {
+        setIsLoading(true)
+        useAuthAPI.registerMFA(useAuthAPI.getToken())
+            .then(data => {
+                setIsLoading(false)
+                console.log(data)
+                setMfaData({data,hasMfa: true })
+                console.log("MFA Regitered Successfully")
+
+            })
+            .catch(error => {
+                setIsLoading(false)
+                console.log("MFA Registration Falied")
+            })
+    }
 
     return (
         <div style={{ padding: 20 }}>
@@ -40,16 +74,25 @@ export default function Dashboard(props) {
                             <Typography gutterBottom variant="h5" component="h2">
                                 {props.title}
                             </Typography>
-                            <Typography variant="body2" component="p">
-                                <div>
-                                    <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(user, null, 4)}
-                                    </pre>
-                                </div>
+                            <Typography variant="body2" component="span">
+                                <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(user, null, 4)}</pre>
                             </Typography>
                         </CardContent>
+                        <Divider />
+                        {mfaData.hasMfa && 
+                        <CardContent>
+                            <Typography gutterBottom variant="h5" component="h2">
+                                Google Autheticator QR
+                            </Typography>
+                            <img className={classes.qrCode} src={`data:image/png;base64,${mfaData.data.googleAutheticator}`} alt={"QR Code"}/>
+                        </CardContent>}
                         <CardActions>
-                            <Button size="small">Learn More</Button>
+                            <div className={classes.wrapper}>
+                                <Button size="small" disabled={isLoading || !useAuthAPI.isAuthenticated() } startIcon={<PhonelinkLockIcon />} onClick={handleRegisterMfa}>Add MFA</Button>
+                                {isLoading && <CircularProgress size={24} className={classes.buttonProgress} />}
+                            </div>
                         </CardActions>
+                        
                     </Card>
                 </Grid>
             </Grid>

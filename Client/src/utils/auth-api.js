@@ -16,8 +16,7 @@ const getToken = () => {
   return window.localStorage.getItem(localStorageKey)
 }
 
-const getUser = () => {
-  let token = getToken()
+const decodeUser = (token) => {
   return token ? jwt(token) : { username: "Guest" }
 }
 
@@ -31,47 +30,38 @@ const isAuthenticated = () => {
 }
 
 const login = (username, password) => {
-  return client('token/', "POST", { username, password })
-    .then(response => {
-      return response.data
-    })
-    .catch(async (error) => {
-      if (error.response) {
-        // that falls out of the range of 2xx
-        let data = await error.response.data
-        throw data.message
-      }
-      throw "Unable fetch credentials"
-    })
+  return client('token/', "POST", { username, password }, "Unable fetch credentials")
 }
 
 const changePassword = (username, password, session) => {
-  return client('token/update', "POST", { username, password, session })
-    .then(response => {
-      return response.data
-    })
-    .catch(async (error) => {
-      if (error.response) {
-        // that falls out of the range of 2xx
-        let data = await error.response.data
-        throw data.message
-      }
-      throw "Unable update password"
-    })
+  return client('token/update', "POST", { username, password, session }, "Unable update password")
 }
 
-const logout = async () => {
+const registerMFA = (accessToken) => {
+  return client('mfa/register', "POST", { accessToken }, "Unable register MFA")
+}
+
+const logout = () => {
   window.localStorage.removeItem(localStorageKey)
   window.location.reload();
 }
 
-const client = (endpoint, method, data) => {
+const client = (endpoint, method, data, defaultErrorMessage) => {
   const config = {
     method: method,
     url: `${authURL}/${endpoint}`,
     data,
   }
   return axios(config)
+    .then(response => response.data)
+    .catch(async (error) => {
+      if (error.response) {
+        // that falls out of the range of 2xx
+        let data = await error.response.data
+        throw new Error(data.message)
+      }
+      throw new Error(defaultErrorMessage)
+    })
 }
 
 const useAuthAPI = {
@@ -79,11 +69,12 @@ const useAuthAPI = {
   getSession,
   getToken,
   setToken,
-  getUser,
+  decodeUser,
   login,
   changePassword,
   logout,
   isAuthenticated,
+  registerMFA,
 }
 
 export { useAuthAPI }

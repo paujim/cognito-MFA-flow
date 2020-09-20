@@ -5,7 +5,7 @@ export const UserContext = React.createContext()
 
 export function UserProvider(props) {
 
-    const [user, setUser] = React.useState(useAuthAPI.getUser());
+    const [user, setUser] = React.useState(useAuthAPI.decodeUser(useAuthAPI.getToken()))
 
     return (
         <UserContext.Provider
