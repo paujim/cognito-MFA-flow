@@ -24,21 +24,49 @@ const useStyles = makeStyles((theme) => ({
     wrapper: {
         margin: theme.spacing(1),
         position: 'relative',
-      },
+    },
     buttonProgress: {
         position: 'absolute',
         top: '50%',
         left: '50%',
         marginTop: -8,
         marginLeft: -4,
-      },
-      media: {
+    },
+    media: {
         height: 140,
-      },
-      qrCode: {
-          width:"100%",
-        },
+    },
+    qrCode: {
+        width: "100%",
+    },
+    pos: {
+        marginBottom: 24,
+    },
 }));
+
+const timeConverter = (unixTimestamp) => {
+    var a = new Date(unixTimestamp * 1000);
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var year = a.getFullYear();
+    var month = months[a.getMonth()];
+    var date = a.getDate();
+    var hour = a.getHours();
+    var min = a.getMinutes();
+    var sec = a.getSeconds();
+    var time = date + ' ' + month + ' ' + year + ' ' + hour + ':' + min + ':' + sec;
+    return time;
+}
+
+const TokenText = (props) => {
+    if (props.exp) {
+        return (
+            <Typography variant="body2" component="div" >
+                Token expiration date: <span color="primary">{timeConverter(props.exp)}</span>
+                <br />
+            Issued by: <span color="textSecondary">{props.iss}</span>
+            </Typography>)
+    }
+    return (<Typography variant="body2" component="div" > No token found </Typography>)
+}
 
 export default function Layout(props) {
     const classes = useStyles();
@@ -55,7 +83,7 @@ export default function Layout(props) {
             .then(data => {
                 setIsLoading(false)
                 console.log(data)
-                setMfaData({data,hasMfa: true })
+                setMfaData({ data, hasMfa: true })
                 console.log("MFA Regitered Successfully")
 
             })
@@ -71,28 +99,32 @@ export default function Layout(props) {
                 <Grid item xs={6}  >
                     <Card className={classes.card} variant="outlined">
                         <CardContent>
-                            <Typography gutterBottom variant="h5" component="h2">
-                                {props.title}
+                            <Typography variant="h6" component="div" >
+                                {user.username}
                             </Typography>
-                            <Typography variant="body2" component="span">
+                            <Typography variant="caption" component="div" color="textSecondary" className={classes.pos}>
+                                {user.sub ? user.sub : "No ID"}
+                            </Typography>
+                            <TokenText iss={user.iss} exp={user.exp} />
+                            {/* <Typography variant="body2" component="span">
                                 <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(user, null, 4)}</pre>
-                            </Typography>
+                            </Typography> */}
                         </CardContent>
                         <Divider />
-                        {mfaData.hasMfa && 
-                        <CardContent>
-                            <Typography gutterBottom variant="h5" component="h2">
-                                Google Autheticator QR
+                        {mfaData.hasMfa &&
+                            <CardContent>
+                                <Typography gutterBottom variant="h5" component="h2">
+                                    Google Autheticator QR
                             </Typography>
-                            <img className={classes.qrCode} src={`data:image/png;base64,${mfaData.data.googleAutheticator}`} alt={"QR Code"}/>
-                        </CardContent>}
+                                <img className={classes.qrCode} src={`data:image/png;base64,${mfaData.data.googleAutheticator}`} alt={"QR Code"} />
+                            </CardContent>}
                         <CardActions>
                             <div className={classes.wrapper}>
-                                <Button size="small" disabled={isLoading || !useAuthAPI.isAuthenticated() } startIcon={<PhonelinkLockIcon />} onClick={handleRegisterMfa}>Add MFA</Button>
+                                <Button size="small" disabled={isLoading || !useAuthAPI.isAuthenticated()} startIcon={<PhonelinkLockIcon />} onClick={handleRegisterMfa}>Add MFA</Button>
                                 {isLoading && <CircularProgress size={24} className={classes.buttonProgress} />}
                             </div>
                         </CardActions>
-                        
+
                     </Card>
                 </Grid>
             </Grid>
