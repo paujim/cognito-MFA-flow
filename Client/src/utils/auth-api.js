@@ -61,7 +61,7 @@ const logout = () => {
 const client = (endpoint, method, data, defaultErrorMessage) => {
   const config = {
     method: method,
-    url: `${authURL}/${endpoint}`,
+    url: `${authURL}${endpoint}`,
     data,
   }
   return axios(config)
