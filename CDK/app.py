@@ -25,5 +25,7 @@ deploy_stack = DeployPipelineStack(
     id="cognito-mfa-deploy-pipeline",
     artifact_bucket=build_stack.artifact_bucket,
     backend_fn=cognito_stack.backend_fn,
+    api=cognito_stack.api,
+    static_website_bucket=cognito_stack.static_website_bucket,
 )
 app.synth()

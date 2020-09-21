@@ -45,14 +45,14 @@ class BuildPipelineStack(core.Stack):
         )
 
         # Codepipeline
-        lambda_pipeline = codepipeline.Pipeline(
+        build_pipeline = codepipeline.Pipeline(
             scope=self,
             id="lambda-pipeline",
             restart_execution_on_update=True,
         )
 
         source_output = codepipeline.Artifact()
-        lambda_pipeline.add_stage(
+        build_pipeline.add_stage(
             stage_name="Source",
             actions=[
                 codepipeline_actions.GitHubSourceAction(
@@ -101,7 +101,7 @@ class BuildPipelineStack(core.Stack):
             }
         }
         build_output = codepipeline.Artifact()
-        lambda_pipeline.add_stage(
+        build_pipeline.add_stage(
             stage_name="Build",
             actions=[codepipeline_actions.CodeBuildAction(
                 action_name="CodeBuild",
@@ -115,7 +115,7 @@ class BuildPipelineStack(core.Stack):
             )]
         )
 
-        lambda_pipeline.add_stage(
+        build_pipeline.add_stage(
             stage_name="Upload",
             actions=[
                 codepipeline_actions.S3DeployAction(
@@ -189,18 +189,15 @@ class CognitoMfaFlowStack(core.Stack):
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=["*"])
         )
+        self.api = api
 
-        core.CfnOutput(
-            scope=self,
-            id="apiURL",
-            value=api.url,
-        )
         self.backend_fn = backend
 
         static_website_bucket = s3.Bucket(
             scope=self,
             id="static-website-bucket",
         )
+        self.static_website_bucket = static_website_bucket
 
         distribution = cloudfront.CloudFrontWebDistribution(
             scope=self,
@@ -223,7 +220,7 @@ class CognitoMfaFlowStack(core.Stack):
 
 class DeployPipelineStack(core.Stack):
 
-    def __init__(self, scope: core.Construct, id: str, artifact_bucket: s3.Bucket, backend_fn: _lambda.Function, **kwargs) -> None:
+    def __init__(self, scope: core.Construct, id: str, artifact_bucket: s3.Bucket, static_website_bucket: s3.Bucket, backend_fn: _lambda.Function, api: apigateway.LambdaRestApi, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         fn = _lambda.Function(
@@ -260,30 +257,92 @@ class DeployPipelineStack(core.Stack):
             restart_execution_on_update=True,
         )
 
-        source_output = codepipeline.Artifact()
+        lambda_source_output = codepipeline.Artifact()
+        client_source_output = codepipeline.Artifact()
         deploy_pipeline.add_stage(
             stage_name="Source",
             actions=[
                 codepipeline_actions.S3SourceAction(
-                    action_name="S3Source",
+                    action_name="LambdaSource",
                     bucket=artifact_bucket,
                     bucket_key="Server/main.zip",
-                    output=source_output,
+                    output=lambda_source_output,
+                ),
+                codepipeline_actions.S3SourceAction(
+                    action_name="ClientSource",
+                    bucket=artifact_bucket,
+                    bucket_key="Client.zip",
+                    output=client_source_output,
+                )]
+        )
+
+        build_specs = {
+            "version": "0.2",
+            "env": {
+                "variables": {
+                    "REACT_APP_AUTH_URL": api.url,
+                }
+            },
+            "phases": {
+                "install": {
+                    "runtime-versions": {
+                        "nodejs": "10",
+                    },
+                    "commands": [
+                        "npm install -g yarn",
+                    ]
+                },
+                "build": {
+                    "commands": [
+                        "cd Client",
+                        "npm install",
+                        "yarn build",
+                    ]
+                }
+            },
+            "artifacts": {
+                "base-directory": "Client/build",
+                "files": [
+                    "**/*",
+                ],
+            }
+        }
+        client_build_output = codepipeline.Artifact()
+        deploy_pipeline.add_stage(
+            stage_name="Build",
+            actions=[
+                codepipeline_actions.CodeBuildAction(
+                    action_name="ClientBuild",
+                    project=codebuild.Project(
+                        scope=self,
+                        id="codebuild-client",
+                        build_spec=codebuild.BuildSpec.from_object(
+                            build_specs),
+                    ),
+                    input=client_source_output,
+                    outputs=[client_build_output]
                 )]
         )
 
         deploy_pipeline.add_stage(
-            stage_name="LambdaUpdate",
+            stage_name="Deploy",
             actions=[
                 codepipeline_actions.LambdaInvokeAction(
                     lambda_=fn,
-                    inputs=[source_output],
+                    inputs=[lambda_source_output],
                     action_name="UpdateSource",
                     user_parameters={
                         "functionName": backend_fn.function_name,
                         "sourceBucket": artifact_bucket.bucket_name,
                         "sourceKey": "Server/main.zip",
                     }
-                )
+                ),
+                codepipeline_actions.S3DeployAction(
+                    bucket=static_website_bucket,
+                    input=client_build_output,
+                    action_name="DeployClient",
+                    extract=True,
+                    # object_key="Server/main.zip",
+                ),
             ]
         )
