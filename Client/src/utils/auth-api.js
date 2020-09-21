@@ -30,23 +30,27 @@ const isAuthenticated = () => {
 }
 
 const login = (username, password) => {
-  return client('token/', "POST", { username, password }, "Unable fetch credentials")
+  return client('token/', "POST", { username, password }, "Unable to fetch credentials")
 }
 
 const changePassword = (username, password, session) => {
-  return client('token/update', "POST", { username, password, session }, "Unable update password")
+  return client('token/update', "POST", { username, password, session }, "Unable to update password")
 }
 
 const verifyCode = (username, code, session) => {
-  return client('token/code', "POST", { username, code, session }, "Unable verify code")
+  return client('token/code', "POST", { username, code, session }, "Unable to verify code")
 }
 
 const registerMFA = (accessToken) => {
-  return client('mfa/register', "POST", { accessToken }, "Unable register MFA")
+  return client('mfa/register', "POST", { accessToken }, "Unable to register MFA")
 }
 
 const verifyMFA = (accessToken, code) => {
-  return client('mfa/verify', "POST", { accessToken, code, deviceName:"Galaxy" }, "Unable verify code")
+  return client('mfa/verify', "POST", { accessToken, code, deviceName:"Galaxy" }, "Unable to verify MFA code")
+}
+
+const enableMFA = (accessToken) => {
+  return client('mfa/enable', "POST", { accessToken }, "Unable to enable MFA")
 }
 
 const logout = () => {
@@ -85,6 +89,7 @@ const useAuthAPI = {
   registerMFA,
   verifyMFA,
   verifyCode,
+  enableMFA,
 }
 
 export { useAuthAPI }

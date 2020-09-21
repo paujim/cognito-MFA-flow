@@ -6,8 +6,7 @@ import InputAdornment from '@material-ui/core/InputAdornment';
 import LinearProgress from '@material-ui/core/LinearProgress';
 import Typography from '@material-ui/core/Typography';
 
-import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
-
+import ScreenLockPortraitIcon from '@material-ui/icons/ScreenLockPortrait';
 
 const useStyles = makeStyles((theme) => ({
     form: {
@@ -28,7 +27,7 @@ const FormCode = (props) => {
                 InputProps={{
                     startAdornment: (
                         <InputAdornment position="start">
-                            <LockOutlinedIcon />
+                            <ScreenLockPortraitIcon />
                         </InputAdornment>
                     ),
                 }}

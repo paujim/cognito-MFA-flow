@@ -112,6 +112,13 @@ export default function Layout(props) {
                 console.log(data)
                 setMfaData({ hasMfa: false })
                 console.log("MFA Code Verified Successfully")
+                useAuthAPI.enableMFA(useAuthAPI.getToken())
+                .then(data => {
+                    console.log("MFA Enabled Successfully")
+                })
+                .catch(error => {
+                    console.log("Unable to enable MFA")
+                })
 
             })
             .catch(error => {
@@ -158,7 +165,6 @@ export default function Layout(props) {
                                                 <IconButton
                                                     aria-label="verify code"
                                                     onClick={handleVerifyMfaCode}
-                                                    // onMouseDown={handleClickVerifyCode}
                                                     edge="end"
                                                 >
                                                     <SendIcon />
