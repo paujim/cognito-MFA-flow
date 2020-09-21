@@ -88,7 +88,7 @@ class BuildPipelineStack(core.Stack):
                         "go build -o main",  # Build the go application
                         "zip main.zip main",  # Zip the go application
                         "cd ..",
-                        "zip -r Client.zip Client"
+                        "cd Client; zip -r src.zip .", # Zip the client
                     ]
                 }
             },
@@ -96,7 +96,7 @@ class BuildPipelineStack(core.Stack):
                 # "base-directory": "Server",
                 "files": [
                     "Server/main.zip",
-                    "Client.zip",
+                    "Client/src.zip",
                 ],
             }
         }
@@ -271,7 +271,7 @@ class DeployPipelineStack(core.Stack):
                 codepipeline_actions.S3SourceAction(
                     action_name="ClientSource",
                     bucket=artifact_bucket,
-                    bucket_key="Client.zip",
+                    bucket_key="Client/src.zip",
                     output=client_source_output,
                 )]
         )
@@ -294,7 +294,7 @@ class DeployPipelineStack(core.Stack):
                 },
                 "build": {
                     "commands": [
-                        "cd Client",
+                        # "cd Client",
                         "npm install",
                         "yarn build",
                     ]
@@ -342,7 +342,6 @@ class DeployPipelineStack(core.Stack):
                     input=client_build_output,
                     action_name="DeployClient",
                     extract=True,
-                    # object_key="Server/main.zip",
                 ),
             ]
         )
