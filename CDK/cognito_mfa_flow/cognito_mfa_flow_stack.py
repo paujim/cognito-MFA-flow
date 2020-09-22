@@ -80,7 +80,7 @@ class BuildPipelineStack(core.Stack):
                         "go build -o main",  # Build the go application
                         "zip main.zip main",  # Zip the go application
                         "cd ..",
-                        "cd Client"
+                        "cd Client",
                         "npm install",
                         "zip -r src.zip .",  # Zip the client
                     ]
