@@ -72,11 +72,6 @@ class BuildPipelineStack(core.Stack):
                 }
             },
             "phases": {
-                "install": {
-                    "commands": [
-                        "npm install -g yarn",
-                    ]
-                },
                 "build": {
                     "commands": [
                         "cd Server",
@@ -86,8 +81,6 @@ class BuildPipelineStack(core.Stack):
                         "zip main.zip main",  # pack the server
                         "cd ..",
                         "cd Client",
-                        "npm install",
-                        "yarn test",
                         "zip -r src.zip .",  # pack the client
                     ]
                 }
@@ -290,13 +283,14 @@ class DeployPipelineStack(core.Stack):
                 },
                 "build": {
                     "commands": [
-                        # "cd Client",
+                        "npm install",
+                        "yarn test",
                         "yarn build",
                     ]
                 }
             },
             "artifacts": {
-                "base-directory": "Client/build",
+                "base-directory": "build",
                 "files": [
                     "**/*",
                 ],
