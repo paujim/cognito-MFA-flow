@@ -72,22 +72,27 @@ class BuildPipelineStack(core.Stack):
                 }
             },
             "phases": {
+                "install": {
+                    "commands": [
+                        "npm install -g yarn",
+                    ]
+                },
                 "build": {
                     "commands": [
                         "cd Server",
                         "go get .",
-                        "go test .",  # Run all tests included with our application
-                        "go build -o main",  # Build the go application
-                        "zip main.zip main",  # Zip the go application
+                        "go test .",
+                        "go build -o main",
+                        "zip main.zip main",  # pack the server
                         "cd ..",
                         "cd Client",
                         "npm install",
-                        "zip -r src.zip .",  # Zip the client
+                        "yarn test",
+                        "zip -r src.zip .",  # pack the client
                     ]
                 }
             },
             "artifacts": {
-                # "base-directory": "Server",
                 "files": [
                     "Server/main.zip",
                     "Client/src.zip",
