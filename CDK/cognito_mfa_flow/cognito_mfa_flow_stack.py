@@ -72,23 +72,17 @@ class BuildPipelineStack(core.Stack):
                 }
             },
             "phases": {
-                "install": {
+                "build": {
                     "commands": [
                         "cd Server",
                         "go get .",
-                    ]
-                },
-                "pre_build": {
-                    "commands": [
                         "go test .",  # Run all tests included with our application
-                    ]
-                },
-                "build": {
-                    "commands": [
                         "go build -o main",  # Build the go application
                         "zip main.zip main",  # Zip the go application
                         "cd ..",
-                        "cd Client; zip -r src.zip .", # Zip the client
+                        "cd Client"
+                        "npm install",
+                        "zip -r src.zip .",  # Zip the client
                     ]
                 }
             },
@@ -285,9 +279,6 @@ class DeployPipelineStack(core.Stack):
             },
             "phases": {
                 "install": {
-                    "runtime-versions": {
-                        "nodejs": "10",
-                    },
                     "commands": [
                         "npm install -g yarn",
                     ]
@@ -295,7 +286,6 @@ class DeployPipelineStack(core.Stack):
                 "build": {
                     "commands": [
                         # "cd Client",
-                        "npm install",
                         "yarn build",
                     ]
                 }
