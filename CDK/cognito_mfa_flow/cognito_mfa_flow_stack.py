@@ -5,8 +5,6 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_apigateway as apigateway,
     aws_lambda as _lambda,
-    aws_cognito as cognito,
-    aws_apigateway as apigateway,
     aws_certificatemanager as acm,
     aws_route53 as route53,
     aws_route53_targets as targets,
