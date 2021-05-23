@@ -14,6 +14,6 @@ Then run the following:
 $env:GOOS = "linux"
 $env:CGO_ENABLED = "0"
 $env:GOARCH = "amd64"
-go build -o main .
+go build -o main .\cmd\
 ~\Go\Bin\build-lambda-zip.exe -output main.zip main
 ```
