@@ -9,14 +9,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	cognito "github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 	ginadapter "github.com/awslabs/aws-lambda-go-api-proxy/gin"
+	"github.com/paujim/cognito-MFA-flow/Server/controllers"
 )
 
 var ginLambda *ginadapter.GinLambda
-var app *App
+var app *controllers.App
 
 func init() {
 	sess := session.Must(session.NewSession())
-	app = createApp(os.Getenv("USER_POOL_ID"), os.Getenv("CLIENT_ID"), cognito.New(sess))
+	app = controllers.NewApp(os.Getenv("USER_POOL_ID"), os.Getenv("CLIENT_ID"), cognito.New(sess))
 	ginLambda = ginadapter.New(app.Router)
 }
 

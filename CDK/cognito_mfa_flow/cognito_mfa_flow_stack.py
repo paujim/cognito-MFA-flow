@@ -73,9 +73,9 @@ class BuildPipelineStack(core.Stack):
                 "build": {
                     "commands": [
                         "cd Server",
-                        "go get .",
-                        "go test .",
-                        "go build -o main",
+                        "go mod download",
+                        "go test ./...",
+                        "> go build -o main ./cmd/",
                         "zip main.zip main",  # pack the server
                         "cd ..",
                         "cd Client",

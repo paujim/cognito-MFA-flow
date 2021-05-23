@@ -1,4 +1,4 @@
-package main
+package controllers
 
 import (
 	"log"
@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type IfaceApp interface {
+type CognitoAPI interface {
 	InitiateAuth(input *cognitoidentityprovider.InitiateAuthInput) (*cognitoidentityprovider.InitiateAuthOutput, error)
 	RespondToAuthChallenge(input *cognitoidentityprovider.RespondToAuthChallengeInput) (*cognitoidentityprovider.RespondToAuthChallengeOutput, error)
 	AssociateSoftwareToken(input *cognitoidentityprovider.AssociateSoftwareTokenInput) (*cognitoidentityprovider.AssociateSoftwareTokenOutput, error)
@@ -16,10 +16,10 @@ type IfaceApp interface {
 }
 
 type App struct {
-	CognitoClient IfaceApp
-	UserPoolID    string
-	AppClientID   string
-	Router        *gin.Engine
+	cognitoAPI  CognitoAPI
+	userPoolID  string
+	appClientID string
+	Router      *gin.Engine
 }
 
 func corsMiddleware() gin.HandlerFunc {
@@ -39,13 +39,13 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func createApp(userPoolID, appClientID string, cognitoClient IfaceApp) *App {
+func NewApp(userPoolID, appClientID string, cognitoAPI CognitoAPI) *App {
 
 	app := &App{
-		CognitoClient: cognitoClient,
-		UserPoolID:    userPoolID,
-		AppClientID:   appClientID,
-		Router:        gin.Default(),
+		cognitoAPI:  cognitoAPI,
+		userPoolID:  userPoolID,
+		appClientID: appClientID,
+		Router:      gin.Default(),
 	}
 	app.Router.Use(corsMiddleware())
 

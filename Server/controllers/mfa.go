@@ -1,4 +1,4 @@
-package main
+package controllers
 
 import (
 	"log"
@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 	"github.com/gin-gonic/gin"
+	"github.com/paujim/cognito-MFA-flow/Server/entities"
 )
 
 const (
@@ -16,28 +17,8 @@ const (
 	GoogleAutheticatorIssuer = "PJ"
 )
 
-type MFARegisterRequest struct {
-	AccessToken *string `form:"accessToken" json:"accessToken" binding:"required"`
-}
-
-type MFAEnableRequest struct {
-	AccessToken *string `form:"accessToken" json:"accessToken" binding:"required"`
-}
-
-type MFAVerifyRequest struct {
-	AccessToken *string `form:"accessToken" json:"accessToken" binding:"required"`
-	Code        *string `form:"code" json:"code" binding:"required"`
-	DeviceName  *string `form:"deviceName" json:"deviceName"`
-}
-
-type MFAResponse struct {
-	Message            *string `json:"message"`
-	SecretCode         *string `json:"secret"`
-	GoogleAutheticator *string `json:"googleAutheticator"`
-}
-
 func successfulMFAResponse(c *gin.Context, secretCode, googleAutheticator *string) {
-	c.JSON(http.StatusOK, MFAResponse{
+	c.JSON(http.StatusOK, entities.MFAResponse{
 		Message:            aws.String("Success"),
 		SecretCode:         secretCode,
 		GoogleAutheticator: googleAutheticator,
@@ -49,19 +30,19 @@ func (app *App) addMFARoutes() {
 
 	mfa.POST("/register", func(c *gin.Context) {
 
-		var request MFARegisterRequest
+		var request entities.MFARegisterRequest
 		if err := c.ShouldBind(&request); err != nil {
-			c.JSON(http.StatusBadRequest, MFAResponse{Message: aws.String("Missing required parameter")})
+			c.JSON(http.StatusBadRequest, entities.MFAResponse{Message: aws.String("Missing required parameter")})
 			return
 		}
 
-		res, err := app.CognitoClient.AssociateSoftwareToken(
+		res, err := app.cognitoAPI.AssociateSoftwareToken(
 			&cognitoidentityprovider.AssociateSoftwareTokenInput{
 				AccessToken: request.AccessToken,
 			})
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, MFAResponse{Message: aws.String("Unable to regiter device")})
-			log.Printf(err.Error())
+			c.JSON(http.StatusUnauthorized, entities.MFAResponse{Message: aws.String("Unable to regiter device")})
+			log.Printf("error: %s", err.Error())
 			return
 		}
 		var encoded *string
@@ -73,13 +54,13 @@ func (app *App) addMFARoutes() {
 	})
 	mfa.POST("/enable", func(c *gin.Context) {
 
-		var request MFAEnableRequest
+		var request entities.MFAEnableRequest
 		if err := c.ShouldBind(&request); err != nil {
-			c.JSON(http.StatusBadRequest, MFAResponse{Message: aws.String("Missing required parameter")})
+			c.JSON(http.StatusBadRequest, entities.MFAResponse{Message: aws.String("Missing required parameter")})
 			return
 		}
 
-		_, err := app.CognitoClient.SetUserMFAPreference(
+		_, err := app.cognitoAPI.SetUserMFAPreference(
 			&cognitoidentityprovider.SetUserMFAPreferenceInput{
 				AccessToken: request.AccessToken,
 				SoftwareTokenMfaSettings: &cognitoidentityprovider.SoftwareTokenMfaSettingsType{
@@ -88,33 +69,33 @@ func (app *App) addMFARoutes() {
 				},
 			})
 		if err != nil {
-			log.Printf(err.Error())
+			log.Printf("error :%s", err.Error())
 		}
 
 		successfulMFAResponse(c, nil, nil)
 	})
 	mfa.POST("/verify", func(c *gin.Context) {
 
-		var request MFAVerifyRequest
+		var request entities.MFAVerifyRequest
 		if err := c.ShouldBind(&request); err != nil {
-			c.JSON(http.StatusBadRequest, MFAResponse{Message: aws.String("Missing required parameter")})
+			c.JSON(http.StatusBadRequest, entities.MFAResponse{Message: aws.String("Missing required parameter")})
 			return
 		}
 
-		res, err := app.CognitoClient.VerifySoftwareToken(
+		res, err := app.cognitoAPI.VerifySoftwareToken(
 			&cognitoidentityprovider.VerifySoftwareTokenInput{
 				AccessToken:        request.AccessToken,
 				UserCode:           request.Code,
 				FriendlyDeviceName: request.DeviceName,
 			})
 		if err != nil {
-			c.JSON(http.StatusBadRequest, MFAResponse{Message: aws.String("Unable to verify code")})
-			log.Printf(err.Error())
+			c.JSON(http.StatusBadRequest, entities.MFAResponse{Message: aws.String("Unable to verify code")})
+			log.Printf("error :%s", err.Error())
 			return
 		}
 		if res.Status != nil && *res.Status == "ERROR" {
-			c.JSON(http.StatusBadRequest, MFAResponse{Message: aws.String("Unable to verify code")})
-			log.Printf(res.GoString())
+			c.JSON(http.StatusBadRequest, entities.MFAResponse{Message: aws.String("Unable to verify code")})
+			log.Printf("resp: %s", res.GoString())
 			return
 		}
 

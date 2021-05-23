@@ -1,4 +1,4 @@
-package main
+package controllers
 
 import (
 	"encoding/json"
@@ -11,15 +11,16 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
+	"github.com/paujim/cognito-MFA-flow/Server/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-type mockedCognitoClient struct {
+type mockedCognito struct {
 	mock.Mock
 }
 
-func (m *mockedCognitoClient) InitiateAuth(input *cognitoidentityprovider.InitiateAuthInput) (*cognitoidentityprovider.InitiateAuthOutput, error) {
+func (m *mockedCognito) InitiateAuth(input *cognitoidentityprovider.InitiateAuthInput) (*cognitoidentityprovider.InitiateAuthOutput, error) {
 	args := m.Called(input)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -27,7 +28,7 @@ func (m *mockedCognitoClient) InitiateAuth(input *cognitoidentityprovider.Initia
 	return args.Get(0).(*cognitoidentityprovider.InitiateAuthOutput), args.Error(1)
 }
 
-func (m *mockedCognitoClient) RespondToAuthChallenge(input *cognitoidentityprovider.RespondToAuthChallengeInput) (*cognitoidentityprovider.RespondToAuthChallengeOutput, error) {
+func (m *mockedCognito) RespondToAuthChallenge(input *cognitoidentityprovider.RespondToAuthChallengeInput) (*cognitoidentityprovider.RespondToAuthChallengeOutput, error) {
 	args := m.Called(input)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -35,7 +36,7 @@ func (m *mockedCognitoClient) RespondToAuthChallenge(input *cognitoidentityprovi
 	return args.Get(0).(*cognitoidentityprovider.RespondToAuthChallengeOutput), args.Error(1)
 }
 
-func (m *mockedCognitoClient) AssociateSoftwareToken(input *cognitoidentityprovider.AssociateSoftwareTokenInput) (*cognitoidentityprovider.AssociateSoftwareTokenOutput, error) {
+func (m *mockedCognito) AssociateSoftwareToken(input *cognitoidentityprovider.AssociateSoftwareTokenInput) (*cognitoidentityprovider.AssociateSoftwareTokenOutput, error) {
 	args := m.Called(input)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -43,7 +44,7 @@ func (m *mockedCognitoClient) AssociateSoftwareToken(input *cognitoidentityprovi
 	return args.Get(0).(*cognitoidentityprovider.AssociateSoftwareTokenOutput), args.Error(1)
 }
 
-func (m *mockedCognitoClient) SetUserMFAPreference(input *cognitoidentityprovider.SetUserMFAPreferenceInput) (*cognitoidentityprovider.SetUserMFAPreferenceOutput, error) {
+func (m *mockedCognito) SetUserMFAPreference(input *cognitoidentityprovider.SetUserMFAPreferenceInput) (*cognitoidentityprovider.SetUserMFAPreferenceOutput, error) {
 	args := m.Called(input)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -51,7 +52,7 @@ func (m *mockedCognitoClient) SetUserMFAPreference(input *cognitoidentityprovide
 	return args.Get(0).(*cognitoidentityprovider.SetUserMFAPreferenceOutput), args.Error(1)
 }
 
-func (m *mockedCognitoClient) VerifySoftwareToken(input *cognitoidentityprovider.VerifySoftwareTokenInput) (*cognitoidentityprovider.VerifySoftwareTokenOutput, error) {
+func (m *mockedCognito) VerifySoftwareToken(input *cognitoidentityprovider.VerifySoftwareTokenInput) (*cognitoidentityprovider.VerifySoftwareTokenOutput, error) {
 	args := m.Called(input)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -67,8 +68,8 @@ func jsonDecode(r *http.Response, target interface{}) error {
 func TestPingURL(t *testing.T) {
 	t.Run("Successful ping", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		mockClient := &mockedCognito{}
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 		resp, err := http.Get(fmt.Sprintf("%s/ping", ts.URL))
 		assert.NoError(err)
@@ -81,20 +82,20 @@ func TestTokenURL(t *testing.T) {
 
 	t.Run("Successful token", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("InitiateAuth", mock.Anything).Return(&cognitoidentityprovider.InitiateAuthOutput{
 			AuthenticationResult: &cognitoidentityprovider.AuthenticationResultType{
 				AccessToken: aws.String("ACCESS_TOKEN"),
 			},
 		}, nil)
 
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
 		assert.NoError(err)
 
-		target := &TokenResponse{}
+		target := &entities.TokenResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusOK, resp.StatusCode)
@@ -103,19 +104,19 @@ func TestTokenURL(t *testing.T) {
 	})
 	t.Run("New password required", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("InitiateAuth", mock.Anything).Return(&cognitoidentityprovider.InitiateAuthOutput{
 			ChallengeName: aws.String("NEW_PASSWORD_REQUIRED"),
 			Session:       aws.String("SESSION"),
 		}, nil)
 
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
 		assert.NoError(err)
 
-		target := &TokenResponse{}
+		target := &entities.TokenResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusOK, resp.StatusCode)
@@ -125,19 +126,19 @@ func TestTokenURL(t *testing.T) {
 	})
 	t.Run("MFA code required", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("InitiateAuth", mock.Anything).Return(&cognitoidentityprovider.InitiateAuthOutput{
 			ChallengeName: aws.String("SOFTWARE_TOKEN_MFA"),
 			Session:       aws.String("SESSION"),
 		}, nil)
 
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
 		assert.NoError(err)
 
-		target := &TokenResponse{}
+		target := &entities.TokenResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusOK, resp.StatusCode)
@@ -147,14 +148,14 @@ func TestTokenURL(t *testing.T) {
 	})
 	t.Run("Validating token request", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		mockClient := &mockedCognito{}
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo","value2": "hugo@password"}`))
 		assert.NoError(err)
 
-		target := &TokenResponse{}
+		target := &entities.TokenResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
@@ -164,10 +165,10 @@ func TestTokenURL(t *testing.T) {
 	})
 	t.Run("Error when authenticating token request", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("InitiateAuth", mock.Anything).Return(nil, errors.New("ERROR with the password"))
 
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password"}`))
@@ -178,20 +179,20 @@ func TestTokenURL(t *testing.T) {
 	})
 	t.Run("Successful update", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("RespondToAuthChallenge", mock.Anything).Return(&cognitoidentityprovider.RespondToAuthChallengeOutput{
 			AuthenticationResult: &cognitoidentityprovider.AuthenticationResultType{
 				AccessToken: aws.String("ACCESS_TOKEN"),
 			},
 		}, nil)
 
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/update", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","password": "hugo@password", "session": "SESSION"}`))
 		assert.NoError(err)
 
-		target := &TokenResponse{}
+		target := &entities.TokenResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusOK, resp.StatusCode)
@@ -201,14 +202,14 @@ func TestTokenURL(t *testing.T) {
 	})
 	t.Run("Validating update request", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		mockClient := &mockedCognito{}
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/update", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo"}`))
 		assert.NoError(err)
 
-		target := &TokenResponse{}
+		target := &entities.TokenResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
@@ -217,20 +218,20 @@ func TestTokenURL(t *testing.T) {
 	})
 	t.Run("Successful code", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("RespondToAuthChallenge", mock.Anything).Return(&cognitoidentityprovider.RespondToAuthChallengeOutput{
 			AuthenticationResult: &cognitoidentityprovider.AuthenticationResultType{
 				AccessToken: aws.String("ACCESS_TOKEN"),
 			},
 		}, nil)
 
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/code", ts.URL), "application/json", strings.NewReader(`{"username": "hugo","code": "123456", "session": "SESSION"}`))
 		assert.NoError(err)
 
-		target := &TokenResponse{}
+		target := &entities.TokenResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusOK, resp.StatusCode)
@@ -239,14 +240,14 @@ func TestTokenURL(t *testing.T) {
 	})
 	t.Run("Validating code request", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		mockClient := &mockedCognito{}
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/token/code", ts.URL), "application/json", strings.NewReader(`{"value1": "hugo"}`))
 		assert.NoError(err)
 
-		target := &TokenResponse{}
+		target := &entities.TokenResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
@@ -259,17 +260,17 @@ func TestMFAURL(t *testing.T) {
 
 	t.Run("Success registering MFA", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("AssociateSoftwareToken", mock.Anything).Return(&cognitoidentityprovider.AssociateSoftwareTokenOutput{
 			SecretCode: aws.String("SECRET_CODE_GENERATED"),
 		}, nil)
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/mfa/register", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN"}`))
 		assert.NoError(err)
 
-		target := &MFAResponse{}
+		target := &entities.MFAResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusOK, resp.StatusCode)
@@ -278,14 +279,14 @@ func TestMFAURL(t *testing.T) {
 	})
 	t.Run("Validating registering MFA", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		mockClient := &mockedCognito{}
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/mfa/register", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
-		target := &MFAResponse{}
+		target := &entities.MFAResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
@@ -295,9 +296,9 @@ func TestMFAURL(t *testing.T) {
 
 	t.Run("Success enabling MFA", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("SetUserMFAPreference", mock.Anything).Return(&cognitoidentityprovider.SetUserMFAPreferenceOutput{}, nil)
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/mfa/enable", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN"}`))
@@ -307,14 +308,14 @@ func TestMFAURL(t *testing.T) {
 	})
 	t.Run("Validating enabling MFA", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		mockClient := &mockedCognito{}
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/mfa/enable", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
-		target := &MFAResponse{}
+		target := &entities.MFAResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
@@ -324,9 +325,9 @@ func TestMFAURL(t *testing.T) {
 
 	t.Run("Verifing MFA successfully", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("VerifySoftwareToken", mock.Anything).Return(&cognitoidentityprovider.VerifySoftwareTokenOutput{Status: aws.String("SUCCESS")}, nil)
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN", "code": "123456"}`))
@@ -336,15 +337,15 @@ func TestMFAURL(t *testing.T) {
 	})
 	t.Run("Failing to verify MFA", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
+		mockClient := &mockedCognito{}
 		mockClient.On("VerifySoftwareToken", mock.Anything).Return(nil, errors.New("WRONG CODE"))
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"accessToken": "ACCESS_TOKEN", "code": "123456"}`))
 		assert.NoError(err)
 
-		target := &MFAResponse{}
+		target := &entities.MFAResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
@@ -354,14 +355,14 @@ func TestMFAURL(t *testing.T) {
 	})
 	t.Run("Validating verifing MFA", func(t *testing.T) {
 		assert := assert.New(t)
-		mockClient := &mockedCognitoClient{}
-		ts := httptest.NewServer(createApp("userPool", "client", mockClient).Router)
+		mockClient := &mockedCognito{}
+		ts := httptest.NewServer(NewApp("userPool", "client", mockClient).Router)
 		defer ts.Close()
 
 		resp, err := http.Post(fmt.Sprintf("%s/mfa/verify", ts.URL), "application/json", strings.NewReader(`{"value": "misssing"}`))
 		assert.NoError(err)
 
-		target := &MFAResponse{}
+		target := &entities.MFAResponse{}
 		jsonDecode(resp, target)
 
 		assert.Equal(http.StatusBadRequest, resp.StatusCode)
